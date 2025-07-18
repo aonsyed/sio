@@ -67,6 +67,10 @@ class SIO_Image_Processor {
      * Constructor
      */
     private function __construct() {
+        // Run detection immediately on construction
+        $this->ensure_libraries_detected();
+        
+        // Also hook into WordPress init for additional setup
         add_action('init', array($this, 'init'));
     }
     
@@ -74,8 +78,8 @@ class SIO_Image_Processor {
      * Initialize
      */
     public function init() {
-        $this->detect_image_libraries();
-        $this->select_best_library();
+        // Force detection on first run or if cache is empty
+        $this->ensure_libraries_detected();
         
         // Hook into WordPress image processing
         add_filter('wp_image_editors', array($this, 'add_custom_image_editor'));
@@ -83,41 +87,113 @@ class SIO_Image_Processor {
     }
     
     /**
+     * Ensure libraries are detected (force detection if needed)
+     */
+    private function ensure_libraries_detected() {
+        // If we don't have any libraries detected, force detection
+        if (empty($this->available_libraries)) {
+            $cached = get_transient('sio_library_check');
+            if (empty($cached)) {
+                // Force fresh detection
+                delete_transient('sio_library_check');
+                $this->detect_image_libraries();
+            } else {
+                $this->available_libraries = $cached;
+            }
+        }
+        
+        // Always select the best library after detection
+        $this->select_best_library();
+    }
+    
+    /**
      * Detect available image libraries with robust error handling
      */
     private function detect_image_libraries() {
-        // Check cache first
+        // Check cache first (but allow bypassing for debugging)
         $cached_libraries = get_transient('sio_library_check');
-        if ($cached_libraries !== false && is_array($cached_libraries)) {
+        if ($cached_libraries !== false && is_array($cached_libraries) && !empty($cached_libraries)) {
             $this->available_libraries = $cached_libraries;
             return;
         }
         
+        // Initialize empty array
         $this->available_libraries = array();
         
-        // Use WordPress's image editor detection as primary method
-        $wp_editors = $this->get_wordpress_image_editors();
-        
-        // Detect ImageMagick with multiple fallback methods
-        $imagick_info = $this->detect_imagick_library();
-        if ($imagick_info) {
-            $this->available_libraries['imagick'] = $imagick_info;
+        try {
+            // Use WordPress's image editor detection as primary method
+            $wp_editors = $this->get_wordpress_image_editors();
+            
+            // Detect ImageMagick with multiple fallback methods
+            $imagick_info = $this->detect_imagick_library();
+            if ($imagick_info) {
+                $this->available_libraries['imagick'] = $imagick_info;
+            }
+            
+            // Detect GD with multiple fallback methods
+            $gd_info = $this->detect_gd_library();
+            if ($gd_info) {
+                $this->available_libraries['gd'] = $gd_info;
+            }
+            
+            // Cross-reference with WordPress editors
+            $this->validate_with_wordpress_editors($wp_editors);
+            
+            // Always cache the results, even if empty (for 1 hour)
+            set_transient('sio_library_check', $this->available_libraries, HOUR_IN_SECONDS);
+            
+            // Log detection results for debugging
+            $this->log_detection_results();
+            
+        } catch (Exception $e) {
+            // Log the error but don't fail completely
+            error_log('SIO Library Detection Error: ' . $e->getMessage());
+            
+            // Try basic detection as fallback
+            $this->basic_library_detection();
+            
+            // Cache even the basic results
+            set_transient('sio_library_check', $this->available_libraries, HOUR_IN_SECONDS);
+        }
+    }
+    
+    /**
+     * Basic library detection fallback
+     */
+    private function basic_library_detection() {
+        // Simple extension checks as absolute fallback
+        if (extension_loaded('imagick') && class_exists('Imagick')) {
+            $this->available_libraries['imagick'] = array(
+                'name' => 'ImageMagick (Basic Detection)',
+                'version' => 'Unknown',
+                'version_number' => 0,
+                'supports_webp' => true, // Assume support
+                'supports_avif' => true, // Assume support
+                'formats' => array('JPEG', 'PNG', 'GIF', 'WEBP', 'AVIF'),
+                'detection_method' => 'basic_fallback',
+                'available' => true
+            );
         }
         
-        // Detect GD with multiple fallback methods
-        $gd_info = $this->detect_gd_library();
-        if ($gd_info) {
-            $this->available_libraries['gd'] = $gd_info;
+        if (extension_loaded('gd') && function_exists('gd_info')) {
+            $this->available_libraries['gd'] = array(
+                'name' => 'GD Library (Basic Detection)',
+                'version' => 'Unknown',
+                'supports_webp' => function_exists('imagewebp'),
+                'supports_avif' => function_exists('imageavif'),
+                'formats' => array('JPEG', 'PNG', 'GIF'),
+                'detection_method' => 'basic_fallback',
+                'available' => true
+            );
+            
+            // Add WebP/AVIF to formats if supported
+            if (function_exists('imagewebp')) {
+                $this->available_libraries['gd']['formats'][] = 'WEBP';
+            }
+            if (function_exists('imageavif')) {
+                $this->available_libraries['gd']['formats'][] = 'AVIF';
+            }
         }
-        
-        // Cross-reference with WordPress editors
-        $this->validate_with_wordpress_editors($wp_editors);
-        
-        // Cache the detection results for 1 hour
-        set_transient('sio_library_check', $this->available_libraries, HOUR_IN_SECONDS);
-        
-        // Log detection results for debugging
-        $this->log_detection_results();
     }
     
     /**
@@ -563,6 +639,10 @@ class SIO_Image_Processor {
      * @return array
      */
     public function get_available_libraries() {
+        // Ensure detection has run
+        if (empty($this->available_libraries)) {
+            $this->ensure_libraries_detected();
+        }
         return $this->available_libraries;
     }
     
@@ -572,6 +652,10 @@ class SIO_Image_Processor {
      * @return string|null
      */
     public function get_current_library() {
+        // Ensure detection has run
+        if (empty($this->available_libraries) || $this->current_library === null) {
+            $this->ensure_libraries_detected();
+        }
         return $this->current_library;
     }
     
@@ -584,9 +668,24 @@ class SIO_Image_Processor {
         // Clear the cache
         delete_transient('sio_library_check');
         
+        // Reset current state
+        $this->available_libraries = array();
+        $this->current_library = null;
+        
         // Re-run detection
         $this->detect_image_libraries();
         $this->select_best_library();
+        
+        // Log forced detection
+        if (SIO_Settings_Manager::instance()->get_setting('enable_logging')) {
+            SIO_Monitor::instance()->log_action(
+                0,
+                'forced_library_detection',
+                'info',
+                'Forced library re-detection completed. Found: ' .
+                (empty($this->available_libraries) ? 'None' : implode(', ', array_keys($this->available_libraries)))
+            );
+        }
         
         return $this->available_libraries;
     }
