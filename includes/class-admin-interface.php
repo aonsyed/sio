@@ -68,6 +68,9 @@ class SIO_Admin_Interface {
         add_action('wp_ajax_sio_view_htaccess', array($this, 'ajax_view_htaccess'));
         add_action('wp_ajax_sio_generate_nginx', array($this, 'ajax_generate_nginx'));
         add_action('wp_ajax_sio_view_nginx', array($this, 'ajax_view_nginx'));
+        add_action('wp_ajax_sio_refresh_libraries', array($this, 'ajax_refresh_libraries'));
+        add_action('wp_ajax_sio_test_libraries', array($this, 'ajax_test_libraries'));
+        add_action('wp_ajax_sio_debug_libraries', array($this, 'ajax_debug_libraries'));
     }
     
     /**
@@ -263,44 +266,97 @@ class SIO_Admin_Interface {
                 <!-- System Status -->
                 <div class="sio-system-status">
                     <h3><?php _e('System Status', 'smart-image-optimizer'); ?></h3>
-                    <table class="widefat">
+                    
+                    <?php
+                    $libraries = SIO_Image_Processor::instance()->get_available_libraries();
+                    $current_library = SIO_Image_Processor::instance()->get_current_library();
+                    ?>
+                    
+                    <!-- Image Libraries Status -->
+                    <div class="sio-libraries-section">
+                        <h4><?php _e('Image Processing Libraries', 'smart-image-optimizer'); ?></h4>
+                        
+                        <?php if (empty($libraries)): ?>
+                            <div class="notice notice-error inline">
+                                <p><?php _e('No image processing libraries detected. Please install ImageMagick or ensure GD is enabled.', 'smart-image-optimizer'); ?></p>
+                                
+                                <?php
+                                // Show diagnostic information when no libraries are detected
+                                $debug_info = SIO_Image_Processor::instance()->get_library_debug_info();
+                                if (!empty($debug_info['diagnostic_info'])):
+                                ?>
+                                <div class="sio-diagnostic-info">
+                                    <h5><?php _e('Diagnostic Information:', 'smart-image-optimizer'); ?></h5>
+                                    <ul>
+                                        <?php foreach ($debug_info['diagnostic_info'] as $info): ?>
+                                            <li><?php echo esc_html($info); ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <table class="widefat">
+                                <thead>
+                                    <tr>
+                                        <th><?php _e('Library', 'smart-image-optimizer'); ?></th>
+                                        <th><?php _e('Version', 'smart-image-optimizer'); ?></th>
+                                        <th><?php _e('WebP Support', 'smart-image-optimizer'); ?></th>
+                                        <th><?php _e('AVIF Support', 'smart-image-optimizer'); ?></th>
+                                        <th><?php _e('Detection Method', 'smart-image-optimizer'); ?></th>
+                                        <th><?php _e('Status', 'smart-image-optimizer'); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($libraries as $lib_name => $lib_info): ?>
+                                        <?php
+                                        $is_current = ($lib_name === $current_library);
+                                        $status_class = $is_current ? 'active' : 'available';
+                                        $status_text = $is_current ? __('Active', 'smart-image-optimizer') : __('Available', 'smart-image-optimizer');
+                                        ?>
+                                        <tr class="<?php echo esc_attr($status_class); ?>">
+                                            <td><strong><?php echo esc_html($lib_info['name']); ?></strong></td>
+                                            <td><?php echo esc_html($lib_info['version']); ?></td>
+                                            <td>
+                                                <?php echo $lib_info['supports_webp'] ?
+                                                    '<span class="sio-status-success">✓</span>' :
+                                                    '<span class="sio-status-error">✗</span>'; ?>
+                                            </td>
+                                            <td>
+                                                <?php echo $lib_info['supports_avif'] ?
+                                                    '<span class="sio-status-success">✓</span>' :
+                                                    '<span class="sio-status-error">✗</span>'; ?>
+                                            </td>
+                                            <td><?php echo esc_html($lib_info['detection_method'] ?? __('Standard', 'smart-image-optimizer')); ?></td>
+                                            <td><span class="status-<?php echo esc_attr($status_class); ?>"><?php echo esc_html($status_text); ?></span></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+                        
+                        <!-- Library Management Buttons -->
+                        <div class="sio-library-actions" style="margin-top: 10px;">
+                            <button type="button" class="button" id="sio-refresh-libraries">
+                                <?php _e('Refresh Libraries', 'smart-image-optimizer'); ?>
+                            </button>
+                            <button type="button" class="button" id="sio-test-libraries">
+                                <?php _e('Test Functionality', 'smart-image-optimizer'); ?>
+                            </button>
+                            <button type="button" class="button" id="sio-debug-libraries">
+                                <?php _e('Show Debug Info', 'smart-image-optimizer'); ?>
+                            </button>
+                        </div>
+                        
+                        <!-- AJAX Result Containers -->
+                        <div id="sio-library-refresh-result" class="sio-ajax-result" style="display: none;"></div>
+                        <div id="sio-library-test-result" class="sio-ajax-result" style="display: none;"></div>
+                        <div id="sio-library-debug-result" class="sio-ajax-result" style="display: none;"></div>
+                    </div>
+                    
+                    <!-- System Information -->
+                    <table class="widefat" style="margin-top: 20px;">
                         <tbody>
-                            <tr>
-                                <td><?php _e('Image Library', 'smart-image-optimizer'); ?></td>
-                                <td>
-                                    <?php 
-                                    $current_lib = $system_info['plugin']['current_library'];
-                                    if ($current_lib) {
-                                        $lib_info = $system_info['plugin']['image_libraries'][$current_lib];
-                                        echo esc_html($lib_info['name'] . ' - ' . $lib_info['version']);
-                                    } else {
-                                        echo '<span class="sio-status-error">' . __('No library available', 'smart-image-optimizer') . '</span>';
-                                    }
-                                    ?>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><?php _e('WebP Support', 'smart-image-optimizer'); ?></td>
-                                <td>
-                                    <?php 
-                                    $webp_support = SIO_Image_Processor::instance()->supports_format('webp');
-                                    echo $webp_support ? 
-                                        '<span class="sio-status-success">' . __('Available', 'smart-image-optimizer') . '</span>' :
-                                        '<span class="sio-status-error">' . __('Not Available', 'smart-image-optimizer') . '</span>';
-                                    ?>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><?php _e('AVIF Support', 'smart-image-optimizer'); ?></td>
-                                <td>
-                                    <?php 
-                                    $avif_support = SIO_Image_Processor::instance()->supports_format('avif');
-                                    echo $avif_support ? 
-                                        '<span class="sio-status-success">' . __('Available', 'smart-image-optimizer') . '</span>' :
-                                        '<span class="sio-status-error">' . __('Not Available', 'smart-image-optimizer') . '</span>';
-                                    ?>
-                                </td>
-                            </tr>
                             <tr>
                                 <td><?php _e('Memory Limit', 'smart-image-optimizer'); ?></td>
                                 <td><?php echo esc_html($system_info['php']['memory_limit']); ?></td>
@@ -1441,6 +1497,237 @@ filter">
         wp_send_json_success(array(
             'config' => $config,
             'filename' => 'nginx-sio.conf'
+        ));
+    }
+    
+    /**
+     * AJAX: Refresh image libraries
+     */
+    public function ajax_refresh_libraries() {
+        // Security check
+        if (!SIO_Security::instance()->check_user_capability('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'smart-image-optimizer'), 403);
+        }
+        
+        check_ajax_referer('sio_ajax_nonce', 'nonce');
+        
+        // Force library re-detection
+        SIO_Image_Processor::instance()->force_library_detection();
+        
+        // Get updated library information
+        $libraries = SIO_Image_Processor::instance()->get_available_libraries();
+        $current_library = SIO_Image_Processor::instance()->get_current_library();
+        
+        $html = '';
+        if (empty($libraries)) {
+            $html .= '<div class="notice notice-error inline">';
+            $html .= '<p>' . __('No image processing libraries detected after refresh.', 'smart-image-optimizer') . '</p>';
+            
+            // Show diagnostic information
+            $debug_info = SIO_Image_Processor::instance()->get_library_debug_info();
+            if (!empty($debug_info['diagnostic_info'])) {
+                $html .= '<div class="sio-diagnostic-info">';
+                $html .= '<h5>' . __('Diagnostic Information:', 'smart-image-optimizer') . '</h5>';
+                $html .= '<ul>';
+                foreach ($debug_info['diagnostic_info'] as $info) {
+                    $html .= '<li>' . esc_html($info) . '</li>';
+                }
+                $html .= '</ul>';
+                $html .= '</div>';
+            }
+            $html .= '</div>';
+        } else {
+            $html .= '<div class="notice notice-success inline">';
+            $html .= '<p>' . sprintf(__('Found %d image processing libraries.', 'smart-image-optimizer'), count($libraries)) . '</p>';
+            $html .= '</div>';
+            
+            $html .= '<table class="widefat">';
+            $html .= '<thead><tr>';
+            $html .= '<th>' . __('Library', 'smart-image-optimizer') . '</th>';
+            $html .= '<th>' . __('Version', 'smart-image-optimizer') . '</th>';
+            $html .= '<th>' . __('WebP Support', 'smart-image-optimizer') . '</th>';
+            $html .= '<th>' . __('AVIF Support', 'smart-image-optimizer') . '</th>';
+            $html .= '<th>' . __('Detection Method', 'smart-image-optimizer') . '</th>';
+            $html .= '<th>' . __('Status', 'smart-image-optimizer') . '</th>';
+            $html .= '</tr></thead>';
+            $html .= '<tbody>';
+            
+            foreach ($libraries as $lib_name => $lib_info) {
+                $is_current = ($lib_name === $current_library);
+                $status_class = $is_current ? 'active' : 'available';
+                $status_text = $is_current ? __('Active', 'smart-image-optimizer') : __('Available', 'smart-image-optimizer');
+                
+                $html .= '<tr class="' . esc_attr($status_class) . '">';
+                $html .= '<td><strong>' . esc_html($lib_info['name']) . '</strong></td>';
+                $html .= '<td>' . esc_html($lib_info['version']) . '</td>';
+                $html .= '<td>' . ($lib_info['supports_webp'] ? '<span class="sio-status-success">✓</span>' : '<span class="sio-status-error">✗</span>') . '</td>';
+                $html .= '<td>' . ($lib_info['supports_avif'] ? '<span class="sio-status-success">✓</span>' : '<span class="sio-status-error">✗</span>') . '</td>';
+                $html .= '<td>' . esc_html($lib_info['detection_method'] ?? __('Standard', 'smart-image-optimizer')) . '</td>';
+                $html .= '<td><span class="status-' . esc_attr($status_class) . '">' . esc_html($status_text) . '</span></td>';
+                $html .= '</tr>';
+            }
+            
+            $html .= '</tbody></table>';
+        }
+        
+        wp_send_json_success(array(
+            'message' => __('Libraries refreshed successfully.', 'smart-image-optimizer'),
+            'html' => $html
+        ));
+    }
+    
+    /**
+     * AJAX: Test library functionality
+     */
+    public function ajax_test_libraries() {
+        // Security check
+        if (!SIO_Security::instance()->check_user_capability('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'smart-image-optimizer'), 403);
+        }
+        
+        check_ajax_referer('sio_ajax_nonce', 'nonce');
+        
+        // Test library functionality
+        $test_results = SIO_Image_Processor::instance()->test_library_functionality();
+        
+        $html = '<div class="sio-test-results">';
+        $html .= '<h4>' . __('Library Functionality Test Results', 'smart-image-optimizer') . '</h4>';
+        
+        if (empty($test_results)) {
+            $html .= '<div class="notice notice-error inline">';
+            $html .= '<p>' . __('No libraries available for testing.', 'smart-image-optimizer') . '</p>';
+            $html .= '</div>';
+        } else {
+            foreach ($test_results as $library => $results) {
+                $html .= '<div class="sio-test-library">';
+                $html .= '<h5>' . esc_html($library) . '</h5>';
+                
+                if ($results['success']) {
+                    $html .= '<div class="notice notice-success inline">';
+                    $html .= '<p>' . __('Library is functioning correctly.', 'smart-image-optimizer') . '</p>';
+                    $html .= '</div>';
+                    
+                    if (!empty($results['formats_tested'])) {
+                        $html .= '<p><strong>' . __('Formats tested:', 'smart-image-optimizer') . '</strong> ' . implode(', ', $results['formats_tested']) . '</p>';
+                    }
+                    
+                    if (!empty($results['test_details'])) {
+                        $html .= '<ul>';
+                        foreach ($results['test_details'] as $detail) {
+                            $html .= '<li>' . esc_html($detail) . '</li>';
+                        }
+                        $html .= '</ul>';
+                    }
+                } else {
+                    $html .= '<div class="notice notice-error inline">';
+                    $html .= '<p>' . __('Library test failed:', 'smart-image-optimizer') . ' ' . esc_html($results['error']) . '</p>';
+                    $html .= '</div>';
+                }
+                
+                $html .= '</div>';
+            }
+        }
+        
+        $html .= '</div>';
+        
+        wp_send_json_success(array(
+            'message' => __('Library functionality test completed.', 'smart-image-optimizer'),
+            'html' => $html
+        ));
+    }
+    
+    /**
+     * AJAX: Show debug information
+     */
+    public function ajax_debug_libraries() {
+        // Security check
+        if (!SIO_Security::instance()->check_user_capability('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'smart-image-optimizer'), 403);
+        }
+        
+        check_ajax_referer('sio_ajax_nonce', 'nonce');
+        
+        // Get comprehensive debug information
+        $debug_info = SIO_Image_Processor::instance()->get_library_debug_info();
+        
+        $html = '<div class="sio-debug-info">';
+        $html .= '<h4>' . __('Library Debug Information', 'smart-image-optimizer') . '</h4>';
+        
+        // PHP Extensions
+        if (!empty($debug_info['php_extensions'])) {
+            $html .= '<div class="sio-debug-section">';
+            $html .= '<h5>' . __('PHP Extensions', 'smart-image-optimizer') . '</h5>';
+            $html .= '<ul>';
+            foreach ($debug_info['php_extensions'] as $ext => $status) {
+                $status_icon = $status ? '✓' : '✗';
+                $status_class = $status ? 'sio-status-success' : 'sio-status-error';
+                $html .= '<li><span class="' . $status_class . '">' . $status_icon . '</span> ' . esc_html($ext) . '</li>';
+            }
+            $html .= '</ul>';
+            $html .= '</div>';
+        }
+        
+        // WordPress Image Editors
+        if (!empty($debug_info['wp_image_editors'])) {
+            $html .= '<div class="sio-debug-section">';
+            $html .= '<h5>' . __('WordPress Image Editors', 'smart-image-optimizer') . '</h5>';
+            $html .= '<ul>';
+            foreach ($debug_info['wp_image_editors'] as $editor => $status) {
+                $status_icon = $status ? '✓' : '✗';
+                $status_class = $status ? 'sio-status-success' : 'sio-status-error';
+                $html .= '<li><span class="' . $status_class . '">' . $status_icon . '</span> ' . esc_html($editor) . '</li>';
+            }
+            $html .= '</ul>';
+            $html .= '</div>';
+        }
+        
+        // Detection Methods
+        if (!empty($debug_info['detection_methods'])) {
+            $html .= '<div class="sio-debug-section">';
+            $html .= '<h5>' . __('Detection Methods Tried', 'smart-image-optimizer') . '</h5>';
+            $html .= '<ul>';
+            foreach ($debug_info['detection_methods'] as $method => $result) {
+                $status_icon = $result['success'] ? '✓' : '✗';
+                $status_class = $result['success'] ? 'sio-status-success' : 'sio-status-error';
+                $html .= '<li><span class="' . $status_class . '">' . $status_icon . '</span> ' . esc_html($method);
+                if (!empty($result['details'])) {
+                    $html .= ' - ' . esc_html($result['details']);
+                }
+                $html .= '</li>';
+            }
+            $html .= '</ul>';
+            $html .= '</div>';
+        }
+        
+        // Diagnostic Information
+        if (!empty($debug_info['diagnostic_info'])) {
+            $html .= '<div class="sio-debug-section">';
+            $html .= '<h5>' . __('Diagnostic Information', 'smart-image-optimizer') . '</h5>';
+            $html .= '<ul>';
+            foreach ($debug_info['diagnostic_info'] as $info) {
+                $html .= '<li>' . esc_html($info) . '</li>';
+            }
+            $html .= '</ul>';
+            $html .= '</div>';
+        }
+        
+        // Error Messages
+        if (!empty($debug_info['errors'])) {
+            $html .= '<div class="sio-debug-section">';
+            $html .= '<h5>' . __('Error Messages', 'smart-image-optimizer') . '</h5>';
+            $html .= '<ul>';
+            foreach ($debug_info['errors'] as $error) {
+                $html .= '<li class="sio-status-error">' . esc_html($error) . '</li>';
+            }
+            $html .= '</ul>';
+            $html .= '</div>';
+        }
+        
+        $html .= '</div>';
+        
+        wp_send_json_success(array(
+            'message' => __('Debug information retrieved.', 'smart-image-optimizer'),
+            'html' => $html
         ));
     }
 }

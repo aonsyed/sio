@@ -83,42 +83,461 @@ class SIO_Image_Processor {
     }
     
     /**
-     * Detect available image libraries
+     * Detect available image libraries with robust error handling
      */
     private function detect_image_libraries() {
+        // Check cache first
+        $cached_libraries = get_transient('sio_library_check');
+        if ($cached_libraries !== false && is_array($cached_libraries)) {
+            $this->available_libraries = $cached_libraries;
+            return;
+        }
+        
         $this->available_libraries = array();
         
-        // Check for ImageMagick
-        if (extension_loaded('imagick')) {
-            $imagick = new Imagick();
-            $formats = $imagick->queryFormats();
-            
-            $this->available_libraries['imagick'] = array(
-                'name' => 'ImageMagick',
-                'version' => $imagick->getVersion()['versionString'],
-                'supports_webp' => in_array('WEBP', $formats),
-                'supports_avif' => in_array('AVIF', $formats),
-                'formats' => $formats
-            );
+        // Use WordPress's image editor detection as primary method
+        $wp_editors = $this->get_wordpress_image_editors();
+        
+        // Detect ImageMagick with multiple fallback methods
+        $imagick_info = $this->detect_imagick_library();
+        if ($imagick_info) {
+            $this->available_libraries['imagick'] = $imagick_info;
         }
         
-        // Check for GD
-        if (extension_loaded('gd')) {
+        // Detect GD with multiple fallback methods
+        $gd_info = $this->detect_gd_library();
+        if ($gd_info) {
+            $this->available_libraries['gd'] = $gd_info;
+        }
+        
+        // Cross-reference with WordPress editors
+        $this->validate_with_wordpress_editors($wp_editors);
+        
+        // Cache the detection results for 1 hour
+        set_transient('sio_library_check', $this->available_libraries, HOUR_IN_SECONDS);
+        
+        // Log detection results for debugging
+        $this->log_detection_results();
+    }
+    
+    /**
+     * Get WordPress image editors
+     *
+     * @return array
+     */
+    private function get_wordpress_image_editors() {
+        $editors = array();
+        
+        try {
+            // Get WordPress's available image editors
+            $wp_editors = wp_image_editor_supports(array('mime_type' => 'image/jpeg'));
+            
+            if (is_array($wp_editors)) {
+                foreach ($wp_editors as $editor_class) {
+                    if (class_exists($editor_class)) {
+                        $editors[] = $editor_class;
+                    }
+                }
+            }
+            
+            // Also check the default editors list
+            $default_editors = apply_filters('wp_image_editors', array('WP_Image_Editor_Imagick', 'WP_Image_Editor_GD'));
+            foreach ($default_editors as $editor_class) {
+                if (class_exists($editor_class) && !in_array($editor_class, $editors)) {
+                    $editors[] = $editor_class;
+                }
+            }
+            
+        } catch (Exception $e) {
+            // Fallback to default editors if WordPress detection fails
+            $editors = array('WP_Image_Editor_Imagick', 'WP_Image_Editor_GD');
+        }
+        
+        return $editors;
+    }
+    
+    /**
+     * Detect ImageMagick library with robust error handling
+     *
+     * @return array|false
+     */
+    private function detect_imagick_library() {
+        // Method 1: Check if extension is loaded
+        if (!extension_loaded('imagick')) {
+            return false;
+        }
+        
+        // Method 2: Check if class exists
+        if (!class_exists('Imagick')) {
+            return false;
+        }
+        
+        try {
+            // Method 3: Try to create Imagick instance
+            $imagick = new Imagick();
+            
+            // Method 4: Get version information safely
+            $version_info = array();
+            try {
+                $version_data = $imagick->getVersion();
+                $version_info = array(
+                    'version_string' => isset($version_data['versionString']) ? $version_data['versionString'] : 'Unknown',
+                    'version_number' => isset($version_data['versionNumber']) ? $version_data['versionNumber'] : 0
+                );
+            } catch (Exception $e) {
+                $version_info = array(
+                    'version_string' => 'Unknown (detection failed)',
+                    'version_number' => 0
+                );
+            }
+            
+            // Method 5: Query supported formats safely
+            $formats = array();
+            $webp_support = false;
+            $avif_support = false;
+            
+            try {
+                $formats = $imagick->queryFormats();
+                $webp_support = in_array('WEBP', $formats);
+                $avif_support = in_array('AVIF', $formats);
+            } catch (Exception $e) {
+                // Fallback: Test format support individually
+                $webp_support = $this->test_imagick_format_support('WEBP');
+                $avif_support = $this->test_imagick_format_support('AVIF');
+                $formats = array('JPEG', 'PNG', 'GIF'); // Basic formats
+                if ($webp_support) $formats[] = 'WEBP';
+                if ($avif_support) $formats[] = 'AVIF';
+            }
+            
+            // Clean up
+            $imagick->clear();
+            $imagick->destroy();
+            
+            return array(
+                'name' => 'ImageMagick',
+                'version' => $version_info['version_string'],
+                'version_number' => $version_info['version_number'],
+                'supports_webp' => $webp_support,
+                'supports_avif' => $avif_support,
+                'formats' => $formats,
+                'detection_method' => 'direct_imagick',
+                'available' => true
+            );
+            
+        } catch (Exception $e) {
+            // Method 6: Fallback detection using WordPress
+            return $this->detect_imagick_via_wordpress();
+        }
+    }
+    
+    /**
+     * Test ImageMagick format support individually
+     *
+     * @param string $format Format to test
+     * @return bool
+     */
+    private function test_imagick_format_support($format) {
+        try {
+            $imagick = new Imagick();
+            $imagick->newImage(1, 1, 'white');
+            $imagick->setImageFormat($format);
+            $result = $imagick->getImageFormat() === $format;
+            $imagick->clear();
+            $imagick->destroy();
+            return $result;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Detect ImageMagick via WordPress image editor
+     *
+     * @return array|false
+     */
+    private function detect_imagick_via_wordpress() {
+        if (!class_exists('WP_Image_Editor_Imagick')) {
+            return false;
+        }
+        
+        try {
+            $editor = new WP_Image_Editor_Imagick();
+            
+            if (method_exists($editor, 'test')) {
+                $test_result = $editor->test();
+                if (is_wp_error($test_result)) {
+                    return false;
+                }
+            }
+            
+            // Test WebP and AVIF support through WordPress editor
+            $webp_support = false;
+            $avif_support = false;
+            
+            if (method_exists($editor, 'supports_mime_type')) {
+                $webp_support = $editor->supports_mime_type('image/webp');
+                $avif_support = $editor->supports_mime_type('image/avif');
+            }
+            
+            return array(
+                'name' => 'ImageMagick (via WordPress)',
+                'version' => 'Unknown',
+                'version_number' => 0,
+                'supports_webp' => $webp_support,
+                'supports_avif' => $avif_support,
+                'formats' => array('JPEG', 'PNG', 'GIF'),
+                'detection_method' => 'wordpress_editor',
+                'available' => true
+            );
+            
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Detect GD library with robust error handling
+     *
+     * @return array|false
+     */
+    private function detect_gd_library() {
+        // Method 1: Check if extension is loaded
+        if (!extension_loaded('gd')) {
+            return false;
+        }
+        
+        // Method 2: Check if gd_info function exists
+        if (!function_exists('gd_info')) {
+            return false;
+        }
+        
+        try {
+            // Method 3: Get GD information safely
             $gd_info = gd_info();
             
-            $this->available_libraries['gd'] = array(
+            if (!is_array($gd_info)) {
+                return false;
+            }
+            
+            // Method 4: Extract version information
+            $version = isset($gd_info['GD Version']) ? $gd_info['GD Version'] : 'Unknown';
+            
+            // Method 5: Test format support with multiple methods
+            $webp_support = $this->test_gd_webp_support($gd_info);
+            $avif_support = $this->test_gd_avif_support();
+            
+            // Method 6: Get supported formats
+            $formats = $this->get_gd_supported_formats($gd_info);
+            
+            return array(
                 'name' => 'GD Library',
-                'version' => $gd_info['GD Version'],
-                'supports_webp' => isset($gd_info['WebP Support']) && $gd_info['WebP Support'],
-                'supports_avif' => function_exists('imageavif'),
-                'formats' => array_keys(array_filter($gd_info, function($key) {
-                    return strpos($key, 'Support') !== false && strpos($key, 'WebP') === false;
-                }, ARRAY_FILTER_USE_KEY))
+                'version' => $version,
+                'supports_webp' => $webp_support,
+                'supports_avif' => $avif_support,
+                'formats' => $formats,
+                'detection_method' => 'direct_gd',
+                'available' => true,
+                'gd_info' => $gd_info
+            );
+            
+        } catch (Exception $e) {
+            // Method 7: Fallback detection using WordPress
+            return $this->detect_gd_via_wordpress();
+        }
+    }
+    
+    /**
+     * Test GD WebP support with multiple methods
+     *
+     * @param array $gd_info GD info array
+     * @return bool
+     */
+    private function test_gd_webp_support($gd_info = null) {
+        // Method 1: Check gd_info
+        if (is_array($gd_info)) {
+            if (isset($gd_info['WebP Support']) && $gd_info['WebP Support']) {
+                return true;
+            }
+        }
+        
+        // Method 2: Check function existence
+        if (function_exists('imagewebp')) {
+            // Method 3: Try to create a test WebP image
+            try {
+                $image = imagecreatetruecolor(1, 1);
+                if ($image) {
+                    $temp_file = tempnam(sys_get_temp_dir(), 'sio_webp_test');
+                    $result = imagewebp($image, $temp_file, 80);
+                    imagedestroy($image);
+                    if ($temp_file && file_exists($temp_file)) {
+                        unlink($temp_file);
+                    }
+                    return $result;
+                }
+            } catch (Exception $e) {
+                // Fall through to return false
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Test GD AVIF support
+     *
+     * @return bool
+     */
+    private function test_gd_avif_support() {
+        // Method 1: Check function existence
+        if (!function_exists('imageavif')) {
+            return false;
+        }
+        
+        // Method 2: Try to create a test AVIF image
+        try {
+            $image = imagecreatetruecolor(1, 1);
+            if ($image) {
+                $temp_file = tempnam(sys_get_temp_dir(), 'sio_avif_test');
+                $result = imageavif($image, $temp_file, 80);
+                imagedestroy($image);
+                if ($temp_file && file_exists($temp_file)) {
+                    unlink($temp_file);
+                }
+                return $result;
+            }
+        } catch (Exception $e) {
+            // Fall through to return false
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Get GD supported formats
+     *
+     * @param array $gd_info GD info array
+     * @return array
+     */
+    private function get_gd_supported_formats($gd_info) {
+        $formats = array();
+        
+        // Basic formats
+        if (isset($gd_info['JPEG Support']) && $gd_info['JPEG Support']) {
+            $formats[] = 'JPEG';
+        }
+        if (isset($gd_info['PNG Support']) && $gd_info['PNG Support']) {
+            $formats[] = 'PNG';
+        }
+        if (isset($gd_info['GIF Read Support']) && $gd_info['GIF Read Support']) {
+            $formats[] = 'GIF';
+        }
+        
+        // Modern formats
+        if (isset($gd_info['WebP Support']) && $gd_info['WebP Support']) {
+            $formats[] = 'WEBP';
+        }
+        if (function_exists('imageavif')) {
+            $formats[] = 'AVIF';
+        }
+        
+        return $formats;
+    }
+    
+    /**
+     * Detect GD via WordPress image editor
+     *
+     * @return array|false
+     */
+    private function detect_gd_via_wordpress() {
+        if (!class_exists('WP_Image_Editor_GD')) {
+            return false;
+        }
+        
+        try {
+            $editor = new WP_Image_Editor_GD();
+            
+            if (method_exists($editor, 'test')) {
+                $test_result = $editor->test();
+                if (is_wp_error($test_result)) {
+                    return false;
+                }
+            }
+            
+            // Test format support through WordPress editor
+            $webp_support = false;
+            $avif_support = false;
+            
+            if (method_exists($editor, 'supports_mime_type')) {
+                $webp_support = $editor->supports_mime_type('image/webp');
+                $avif_support = $editor->supports_mime_type('image/avif');
+            }
+            
+            return array(
+                'name' => 'GD Library (via WordPress)',
+                'version' => 'Unknown',
+                'supports_webp' => $webp_support,
+                'supports_avif' => $avif_support,
+                'formats' => array('JPEG', 'PNG', 'GIF'),
+                'detection_method' => 'wordpress_editor',
+                'available' => true
+            );
+            
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Validate detected libraries with WordPress editors
+     *
+     * @param array $wp_editors WordPress image editors
+     */
+    private function validate_with_wordpress_editors($wp_editors) {
+        foreach ($wp_editors as $editor_class) {
+            if ($editor_class === 'WP_Image_Editor_Imagick' && !isset($this->available_libraries['imagick'])) {
+                // WordPress thinks ImageMagick is available but we didn't detect it
+                $imagick_info = $this->detect_imagick_via_wordpress();
+                if ($imagick_info) {
+                    $this->available_libraries['imagick'] = $imagick_info;
+                }
+            }
+            
+            if ($editor_class === 'WP_Image_Editor_GD' && !isset($this->available_libraries['gd'])) {
+                // WordPress thinks GD is available but we didn't detect it
+                $gd_info = $this->detect_gd_via_wordpress();
+                if ($gd_info) {
+                    $this->available_libraries['gd'] = $gd_info;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Log detection results for debugging
+     */
+    private function log_detection_results() {
+        if (!SIO_Settings_Manager::instance()->get_setting('enable_logging')) {
+            return;
+        }
+        
+        $message = sprintf(
+            'Image library detection completed. Found: %s',
+            empty($this->available_libraries) ? 'None' : implode(', ', array_keys($this->available_libraries))
+        );
+        
+        // Add detailed information for each library
+        foreach ($this->available_libraries as $lib_name => $lib_info) {
+            $message .= sprintf(
+                ' | %s: %s (WebP: %s, AVIF: %s, Method: %s)',
+                $lib_name,
+                $lib_info['version'],
+                $lib_info['supports_webp'] ? 'Yes' : 'No',
+                $lib_info['supports_avif'] ? 'Yes' : 'No',
+                $lib_info['detection_method']
             );
         }
         
-        // Cache the detection results
-        set_transient('sio_library_check', $this->available_libraries, HOUR_IN_SECONDS);
+        SIO_Monitor::instance()->log_action(0, 'library_detection', 'success', $message);
     }
     
     /**
@@ -154,6 +573,253 @@ class SIO_Image_Processor {
      */
     public function get_current_library() {
         return $this->current_library;
+    }
+    
+    /**
+     * Force re-detection of image libraries (clears cache)
+     *
+     * @return array
+     */
+    public function force_library_detection() {
+        // Clear the cache
+        delete_transient('sio_library_check');
+        
+        // Re-run detection
+        $this->detect_image_libraries();
+        $this->select_best_library();
+        
+        return $this->available_libraries;
+    }
+    
+    /**
+     * Get detailed library information for debugging
+     *
+     * @return array
+     */
+    public function get_library_debug_info() {
+        $debug_info = array(
+            'detection_timestamp' => current_time('mysql'),
+            'wordpress_editors' => $this->get_wordpress_image_editors(),
+            'php_extensions' => array(
+                'imagick_loaded' => extension_loaded('imagick'),
+                'gd_loaded' => extension_loaded('gd'),
+                'imagick_class_exists' => class_exists('Imagick'),
+                'gd_info_function_exists' => function_exists('gd_info')
+            ),
+            'function_tests' => array(
+                'imagewebp_exists' => function_exists('imagewebp'),
+                'imageavif_exists' => function_exists('imageavif')
+            ),
+            'detected_libraries' => $this->available_libraries,
+            'selected_library' => $this->current_library,
+            'cache_status' => get_transient('sio_library_check') !== false ? 'cached' : 'fresh'
+        );
+        
+        // Add GD specific info if available
+        if (function_exists('gd_info')) {
+            try {
+                $debug_info['gd_detailed_info'] = gd_info();
+            } catch (Exception $e) {
+                $debug_info['gd_detailed_info'] = array('error' => $e->getMessage());
+            }
+        }
+        
+        // Add ImageMagick specific info if available
+        if (class_exists('Imagick')) {
+            try {
+                $imagick = new Imagick();
+                $debug_info['imagick_detailed_info'] = array(
+                    'version' => $imagick->getVersion(),
+                    'formats' => $imagick->queryFormats(),
+                    'configure_options' => $imagick->getConfigureOptions()
+                );
+                $imagick->clear();
+                $imagick->destroy();
+            } catch (Exception $e) {
+                $debug_info['imagick_detailed_info'] = array('error' => $e->getMessage());
+            }
+        }
+        
+        return $debug_info;
+    }
+    
+    /**
+     * Test library functionality with a real image
+     *
+     * @return array
+     */
+    public function test_library_functionality() {
+        $test_results = array();
+        
+        // Create a simple test image
+        $test_image_path = $this->create_test_image();
+        
+        if (!$test_image_path) {
+            return array('error' => 'Could not create test image');
+        }
+        
+        // Test each available library
+        foreach ($this->available_libraries as $lib_name => $lib_info) {
+            $test_results[$lib_name] = $this->test_single_library($lib_name, $test_image_path);
+        }
+        
+        // Clean up test image
+        if (file_exists($test_image_path)) {
+            unlink($test_image_path);
+        }
+        
+        return $test_results;
+    }
+    
+    /**
+     * Create a test image for functionality testing
+     *
+     * @return string|false
+     */
+    private function create_test_image() {
+        try {
+            $test_image = imagecreatetruecolor(100, 100);
+            if (!$test_image) {
+                return false;
+            }
+            
+            // Fill with a simple pattern
+            $white = imagecolorallocate($test_image, 255, 255, 255);
+            $blue = imagecolorallocate($test_image, 0, 100, 200);
+            imagefill($test_image, 0, 0, $white);
+            imagefilledrectangle($test_image, 25, 25, 75, 75, $blue);
+            
+            // Save as JPEG
+            $temp_path = tempnam(sys_get_temp_dir(), 'sio_test_') . '.jpg';
+            $result = imagejpeg($test_image, $temp_path, 90);
+            imagedestroy($test_image);
+            
+            return $result ? $temp_path : false;
+            
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Test a single library's functionality
+     *
+     * @param string $lib_name Library name
+     * @param string $test_image_path Test image path
+     * @return array
+     */
+    private function test_single_library($lib_name, $test_image_path) {
+        $results = array(
+            'basic_load' => false,
+            'webp_conversion' => false,
+            'avif_conversion' => false,
+            'errors' => array()
+        );
+        
+        try {
+            if ($lib_name === 'imagick' && class_exists('Imagick')) {
+                $results = $this->test_imagick_functionality($test_image_path);
+            } elseif ($lib_name === 'gd' && extension_loaded('gd')) {
+                $results = $this->test_gd_functionality($test_image_path);
+            }
+        } catch (Exception $e) {
+            $results['errors'][] = $e->getMessage();
+        }
+        
+        return $results;
+    }
+    
+    /**
+     * Test ImageMagick functionality
+     *
+     * @param string $test_image_path Test image path
+     * @return array
+     */
+    private function test_imagick_functionality($test_image_path) {
+        $results = array(
+            'basic_load' => false,
+            'webp_conversion' => false,
+            'avif_conversion' => false,
+            'errors' => array()
+        );
+        
+        try {
+            // Test basic loading
+            $imagick = new Imagick($test_image_path);
+            $results['basic_load'] = true;
+            
+            // Test WebP conversion
+            if ($this->available_libraries['imagick']['supports_webp']) {
+                $webp_path = tempnam(sys_get_temp_dir(), 'sio_webp_test_') . '.webp';
+                $imagick->setImageFormat('WEBP');
+                $imagick->writeImage($webp_path);
+                $results['webp_conversion'] = file_exists($webp_path) && filesize($webp_path) > 0;
+                if (file_exists($webp_path)) unlink($webp_path);
+            }
+            
+            // Test AVIF conversion
+            if ($this->available_libraries['imagick']['supports_avif']) {
+                $avif_path = tempnam(sys_get_temp_dir(), 'sio_avif_test_') . '.avif';
+                $imagick->setImageFormat('AVIF');
+                $imagick->writeImage($avif_path);
+                $results['avif_conversion'] = file_exists($avif_path) && filesize($avif_path) > 0;
+                if (file_exists($avif_path)) unlink($avif_path);
+            }
+            
+            $imagick->clear();
+            $imagick->destroy();
+            
+        } catch (Exception $e) {
+            $results['errors'][] = 'ImageMagick test failed: ' . $e->getMessage();
+        }
+        
+        return $results;
+    }
+    
+    /**
+     * Test GD functionality
+     *
+     * @param string $test_image_path Test image path
+     * @return array
+     */
+    private function test_gd_functionality($test_image_path) {
+        $results = array(
+            'basic_load' => false,
+            'webp_conversion' => false,
+            'avif_conversion' => false,
+            'errors' => array()
+        );
+        
+        try {
+            // Test basic loading
+            $image = imagecreatefromjpeg($test_image_path);
+            if ($image) {
+                $results['basic_load'] = true;
+                
+                // Test WebP conversion
+                if ($this->available_libraries['gd']['supports_webp'] && function_exists('imagewebp')) {
+                    $webp_path = tempnam(sys_get_temp_dir(), 'sio_webp_test_') . '.webp';
+                    $webp_result = imagewebp($image, $webp_path, 80);
+                    $results['webp_conversion'] = $webp_result && file_exists($webp_path) && filesize($webp_path) > 0;
+                    if (file_exists($webp_path)) unlink($webp_path);
+                }
+                
+                // Test AVIF conversion
+                if ($this->available_libraries['gd']['supports_avif'] && function_exists('imageavif')) {
+                    $avif_path = tempnam(sys_get_temp_dir(), 'sio_avif_test_') . '.avif';
+                    $avif_result = imageavif($image, $avif_path, 80);
+                    $results['avif_conversion'] = $avif_result && file_exists($avif_path) && filesize($avif_path) > 0;
+                    if (file_exists($avif_path)) unlink($avif_path);
+                }
+                
+                imagedestroy($image);
+            }
+            
+        } catch (Exception $e) {
+            $results['errors'][] = 'GD test failed: ' . $e->getMessage();
+        }
+        
+        return $results;
     }
     
     /**

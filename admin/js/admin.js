@@ -33,6 +33,9 @@
         // System info
         initSystemInfo();
         
+        // Library debugging
+        initLibraryDebugging();
+        
         // Server configuration
         initServerConfig();
         
@@ -197,6 +200,29 @@
         $('#sio-export-system-info').on('click', function(e) {
             e.preventDefault();
             exportSystemInfo();
+        });
+    }
+
+    /**
+     * Initialize library debugging functionality
+     */
+    function initLibraryDebugging() {
+        // Refresh libraries button
+        $('#sio-refresh-libraries').on('click', function(e) {
+            e.preventDefault();
+            refreshLibraries();
+        });
+        
+        // Test libraries button
+        $('#sio-test-libraries').on('click', function(e) {
+            e.preventDefault();
+            testLibraries();
+        });
+        
+        // Debug libraries button
+        $('#sio-debug-libraries').on('click', function(e) {
+            e.preventDefault();
+            debugLibraries();
         });
     }
 
@@ -771,6 +797,123 @@
         window.URL.revokeObjectURL(url);
         
         showNotice('success', 'Configuration file downloaded.');
+    }
+
+    /**
+     * Refresh image libraries
+     */
+    function refreshLibraries() {
+        var $button = $('#sio-refresh-libraries');
+        var $resultContainer = $('#sio-library-refresh-result');
+        
+        $button.prop('disabled', true);
+        showSpinner($button);
+        $resultContainer.hide().empty();
+        
+        var data = {
+            action: 'sio_refresh_libraries',
+            nonce: window.sioAdmin.nonce
+        };
+        
+        $.post(window.sioAdmin.ajaxUrl, data)
+            .done(function(response) {
+                if (response.success) {
+                    showNotice('success', response.data.message);
+                    $resultContainer.html(response.data.html).show();
+                    
+                    // Scroll to results
+                    $('html, body').animate({
+                        scrollTop: $resultContainer.offset().top - 50
+                    }, 500);
+                } else {
+                    showNotice('error', response.data || 'Failed to refresh libraries.');
+                }
+            })
+            .fail(function() {
+                showNotice('error', 'Failed to refresh libraries.');
+            })
+            .always(function() {
+                $button.prop('disabled', false);
+                hideSpinner($button);
+            });
+    }
+
+    /**
+     * Test library functionality
+     */
+    function testLibraries() {
+        var $button = $('#sio-test-libraries');
+        var $resultContainer = $('#sio-library-test-result');
+        
+        $button.prop('disabled', true);
+        showSpinner($button);
+        $resultContainer.hide().empty();
+        
+        var data = {
+            action: 'sio_test_libraries',
+            nonce: window.sioAdmin.nonce
+        };
+        
+        $.post(window.sioAdmin.ajaxUrl, data)
+            .done(function(response) {
+                if (response.success) {
+                    showNotice('success', response.data.message);
+                    $resultContainer.html(response.data.html).show();
+                    
+                    // Scroll to results
+                    $('html, body').animate({
+                        scrollTop: $resultContainer.offset().top - 50
+                    }, 500);
+                } else {
+                    showNotice('error', response.data || 'Failed to test libraries.');
+                }
+            })
+            .fail(function() {
+                showNotice('error', 'Failed to test libraries.');
+            })
+            .always(function() {
+                $button.prop('disabled', false);
+                hideSpinner($button);
+            });
+    }
+
+    /**
+     * Show library debug information
+     */
+    function debugLibraries() {
+        var $button = $('#sio-debug-libraries');
+        var $resultContainer = $('#sio-library-debug-result');
+        
+        $button.prop('disabled', true);
+        showSpinner($button);
+        $resultContainer.hide().empty();
+        
+        var data = {
+            action: 'sio_debug_libraries',
+            nonce: window.sioAdmin.nonce
+        };
+        
+        $.post(window.sioAdmin.ajaxUrl, data)
+            .done(function(response) {
+                if (response.success) {
+                    showNotice('success', response.data.message);
+                    $resultContainer.html(response.data.html).show();
+                    
+                    // Scroll to results
+                    $('html, body').animate({
+                        scrollTop: $resultContainer.offset().top - 50
+                    }, 500);
+                } else {
+                    showNotice('error', response.data || 'Failed to get debug information.');
+                }
+            })
+            .fail(function() {
+                showNotice('error', 'Failed to get debug information.');
+            })
+            .always(function() {
+                $button.prop('disabled', false);
+                hideSpinner($button);
+            });
     }
 
     /**

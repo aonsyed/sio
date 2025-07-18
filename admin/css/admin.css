@@ -118,6 +118,146 @@
     font-weight: bold;
 }
 
+/* Library Debugging Styles */
+.sio-libraries-section {
+    margin-bottom: 20px;
+}
+
+.sio-libraries-section h4 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.sio-library-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.sio-ajax-result {
+    margin-top: 15px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f9f9f9;
+}
+
+.sio-diagnostic-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+}
+
+.sio-diagnostic-info h5 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #856404;
+}
+
+.sio-diagnostic-info ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.sio-diagnostic-info li {
+    margin-bottom: 5px;
+    color: #856404;
+}
+
+.sio-test-results {
+    margin-top: 10px;
+}
+
+.sio-test-results h4 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.sio-test-library {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.sio-test-library h5 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.sio-debug-info {
+    margin-top: 10px;
+}
+
+.sio-debug-info h4 {
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.sio-debug-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.sio-debug-section h5 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #23282d;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.sio-debug-section ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.sio-debug-section li {
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sio-debug-section .sio-status-success,
+.sio-debug-section .sio-status-error {
+    font-size: 14px;
+    min-width: 16px;
+    text-align: center;
+}
+
+/* Table Status Indicators */
+.widefat tr.active {
+    background-color: #e7f3ff;
+}
+
+.widefat tr.available {
+    background-color: #f9f9f9;
+}
+
+.status-active {
+    color: #46b450;
+    font-weight: bold;
+}
+
+.status-available {
+    color: #0073aa;
+    font-weight: normal;
+}
+
 /* Settings Page */
 .sio-settings-tabs {
     margin-top: 20px;
