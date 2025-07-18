@@ -1,0 +1,561 @@
+/**
+ * Smart Image Optimizer Admin Styles
+ *
+ * @package SmartImageOptimizer
+ */
+
+/* General Admin Styles */
+.sio-dashboard {
+    margin-top: 20px;
+}
+
+.sio-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.sio-card h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.sio-stat-number {
+    font-size: 32px;
+    font-weight: bold;
+    color: #0073aa;
+    line-height: 1;
+}
+
+.sio-queue-status div {
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+/* Processing Status */
+.sio-processing-status {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-processing-status h3 {
+    margin: 0 0 15px 0;
+}
+
+.sio-progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #f1f1f1;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.sio-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0073aa, #005177);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+/* Quick Actions */
+.sio-quick-actions {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-quick-actions h3 {
+    margin: 0 0 15px 0;
+}
+
+.sio-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+/* System Status */
+.sio-system-status {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.sio-system-status h3 {
+    margin: 0 0 15px 0;
+}
+
+.sio-status-success {
+    color: #46b450;
+    font-weight: bold;
+}
+
+.sio-status-error {
+    color: #dc3232;
+    font-weight: bold;
+}
+
+.sio-status-warning {
+    color: #ffb900;
+    font-weight: bold;
+}
+
+/* Settings Page */
+.sio-settings-tabs {
+    margin-top: 20px;
+}
+
+.nav-tab-wrapper {
+    border-bottom: 1px solid #ccd0d4;
+    margin-bottom: 20px;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Batch Processing Page */
+.sio-batch-interface {
+    margin-top: 20px;
+}
+
+.sio-queue-overview {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-queue-overview h3 {
+    margin: 0 0 15px 0;
+}
+
+.sio-queue-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+}
+
+.sio-stat {
+    text-align: center;
+}
+
+.sio-stat-label {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.sio-stat-value {
+    display: block;
+    font-size: 24px;
+    font-weight: bold;
+    color: #0073aa;
+}
+
+.sio-processing-controls {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-processing-controls h3 {
+    margin: 0 0 15px 0;
+}
+
+.sio-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.sio-progress-section {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-progress-section h3 {
+    margin: 0 0 15px 0;
+}
+
+.sio-queue-items {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.sio-queue-items h3 {
+    margin: 0 0 15px 0;
+}
+
+.sio-queue-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.sio-queue-filters select,
+.sio-queue-filters input {
+    min-width: 150px;
+}
+
+#sio-queue-list {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sio-queue-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sio-queue-item:last-child {
+    border-bottom: none;
+}
+
+.sio-queue-item-info {
+    flex: 1;
+}
+
+.sio-queue-item-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.sio-queue-item-meta {
+    font-size: 12px;
+    color: #666;
+}
+
+.sio-queue-item-status {
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.sio-queue-item-status.pending {
+    background: #f0f0f1;
+    color: #646970;
+}
+
+.sio-queue-item-status.processing {
+    background: #d63638;
+    color: #fff;
+}
+
+.sio-queue-item-status.completed {
+    background: #00a32a;
+    color: #fff;
+}
+
+.sio-queue-item-status.failed {
+    background: #d63638;
+    color: #fff;
+}
+
+/* Monitor Page */
+.sio-monitor-interface {
+    margin-top: 20px;
+}
+
+.sio-log-filters {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-filter-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.sio-filter-row select,
+.sio-filter-row input {
+    min-width: 150px;
+}
+
+.sio-logs-table {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+#sio-logs-container {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-height: 500px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.sio-log-entry {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.sio-log-entry:last-child {
+    border-bottom: none;
+}
+
+.sio-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.sio-log-timestamp {
+    font-size: 12px;
+    color: #666;
+}
+
+.sio-log-status {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.sio-log-status.success {
+    background: #00a32a;
+    color: #fff;
+}
+
+.sio-log-status.error {
+    background: #d63638;
+    color: #fff;
+}
+
+.sio-log-status.warning {
+    background: #ffb900;
+    color: #000;
+}
+
+.sio-log-status.info {
+    background: #0073aa;
+    color: #fff;
+}
+
+.sio-log-message {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.sio-log-details {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: monospace;
+    white-space: pre-wrap;
+}
+
+.sio-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+}
+
+.sio-pagination a,
+.sio-pagination span {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-decoration: none;
+    color: #0073aa;
+}
+
+.sio-pagination .current {
+    background: #0073aa;
+    color: #fff;
+}
+
+/* System Info Page */
+.sio-system-info {
+    margin-top: 20px;
+}
+
+.sio-info-section {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sio-info-section h3 {
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.sio-info-section table {
+    margin-bottom: 0;
+}
+
+.sio-info-section td:first-child {
+    font-weight: bold;
+    width: 30%;
+}
+
+/* Loading States */
+.sio-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.sio-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: sio-spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes sio-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .sio-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .sio-actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .sio-controls-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .sio-queue-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .sio-filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .sio-filter-row select,
+    .sio-filter-row input {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .sio-queue-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .sio-log-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
+
+/* Accessibility */
+.screen-reader-text {
+    clip: rect(1px, 1px, 1px, 1px);
+    position: absolute !important;
+    height: 1px;
+    width: 1px;
+    overflow: hidden;
+}
+
+/* Focus States */
+button:focus,
+input:focus,
+select:focus,
+.button:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .sio-card,
+    .sio-processing-status,
+    .sio-quick-actions,
+    .sio-system-status,
+    .sio-queue-overview,
+    .sio-processing-controls,
+    .sio-progress-section,
+    .sio-queue-items,
+    .sio-log-filters,
+    .sio-logs-table,
+    .sio-info-section {
+        border-width: 2px;
+    }
+    
+    .sio-progress-bar {
+        border: 1px solid #000;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .sio-actions-grid,
+    .sio-controls-grid,
+    .sio-filter-row,
+    .button {
+        display: none !important;
+    }
+    
+    .sio-card,
+    .sio-info-section {
+        break-inside: avoid;
+    }
+}
